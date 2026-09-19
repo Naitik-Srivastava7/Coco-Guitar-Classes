@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "Coco Guitar Classes",
+  "short_name": "Coco Receipts",
+  "description": "Receipt, expense, and student tracking tool for Coco Guitar Classes.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F1E8",
+  "theme_color": "#B4812F",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "education"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
