@@ -336,6 +336,11 @@
     <h3>Receipt history</h3>
     <div id="historyBody"><div class="empty-note">Loading…</div></div>
   </div>
+  <div class="card">
+    <h3>Recently deleted</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-8px;">Deleted receipts are hidden, not erased — restore them here, or remove one for good.</p>
+    <div id="binBody"><div class="empty-note">Loading…</div></div>
+  </div>
 </div>
 
 <!-- ================= EXPENSES TAB ================= -->
@@ -428,6 +433,7 @@ let state = {
   classMode:'Online', receiptNumber:null
 };
 let receipts = [];
+let deletedReceipts = [];
 let expensesList = [];
 
 const $ = id => document.getElementById(id);
@@ -457,6 +463,7 @@ function buildStudentDirectory(onlineRows, offlineRows){
   const dir = {};
   function ingest(rows, classMode){
     rows.forEach(r => {
+      if(r.Deleted) return; // soft-deleted receipts don't count toward student history
       const name = String(r.StudentName || '').trim();
       if(!name) return;
       const key = name.toLowerCase();
@@ -951,8 +958,11 @@ async function loadHistory(force){
     const data = await apiGet(force);
     const online = data.online.map(r => ({...normalizeReceipt(r), classMode:'Online'}));
     const offline = data.offline.map(r => ({...normalizeReceipt(r), classMode:'Offline'}));
-    receipts = online.concat(offline);
+    const all = online.concat(offline);
+    receipts = all.filter(r => !r.deleted);
+    deletedReceipts = all.filter(r => r.deleted);
     renderHistory();
+    renderBin();
   }catch(e){
     body.innerHTML = '<div class="empty-note">Could not reach the sheet. Check your internet connection. <button class="icon-btn" onclick="loadHistory(true)">Retry</button></div>';
   }
@@ -961,7 +971,8 @@ function normalizeReceipt(r){
   return {
     receiptNumber: r.ReceiptNo, billDate: r.Date, studentName: r.StudentName, studentContact: r.StudentContact,
     batch: r.Batch, feeMonth: r.FeeMonth, feeType: r.FeeType, totalFee: r.TotalFee, amountPaid: r.AmountPaid, due: r.Due,
-    paymentMode: r.PaymentMode, currency: r.Currency || '₹', instructorName: r.Instructor, phone: r.Phone
+    paymentMode: r.PaymentMode, currency: r.Currency || '₹', instructorName: r.Instructor, phone: r.Phone,
+    deleted: r.Deleted || ''
   };
 }
 // A visible, in-app two-tap confirmation for destructive actions: first
@@ -1022,10 +1033,45 @@ function renderHistory(){
 async function deleteReceipt(receiptNumber, classMode){
   try{
     await api({ action:'delete', receiptNumber, classMode });
+    const moved = receipts.find(r => r.receiptNumber === receiptNumber);
     receipts = receipts.filter(r => r.receiptNumber !== receiptNumber);
+    if(moved){ moved.deleted = new Date().toISOString(); deletedReceipts.push(moved); }
     invalidateCache();
     loadStudentDirectory(true);
     renderHistory();
+    renderBin();
+  }catch(e){ alert('Could not delete — check your internet connection and try again.'); }
+}
+
+function renderBin(){
+  const body = $('binBody');
+  if(deletedReceipts.length === 0){ body.innerHTML = '<div class="empty-note">Nothing in the bin.</div>'; return; }
+  const sorted = deletedReceipts.slice().sort((a,b) => new Date(b.deleted) - new Date(a.deleted));
+  body.innerHTML = sorted.map(r => `
+    <div class="hist-row">
+      <span class="badge ${r.classMode.toLowerCase()}">${r.classMode}</span>
+      <span class="hname">${escapeHtml(r.studentName)||'—'}</span>
+      <span class="hmeta">${formatDate(r.billDate)} · ${r.currency}${(parseFloat(r.amountPaid)||0).toFixed(0)}</span>
+      <button class="icon-btn" data-restore="${r.receiptNumber}" data-mode="${r.classMode}">Restore</button>
+      <button class="icon-btn" data-permdel="${r.receiptNumber}" data-mode="${r.classMode}">Delete forever</button>
+    </div>`).join('');
+  body.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', () => restoreReceipt(b.dataset.restore, b.dataset.mode)));
+  body.querySelectorAll('[data-permdel]').forEach(b => b.addEventListener('click', () => armDeleteButton(b, () => permanentlyDeleteReceipt(b.dataset.permdel, b.dataset.mode))));
+}
+async function restoreReceipt(receiptNumber, classMode){
+  try{
+    await api({ action:'restore', receiptNumber, classMode });
+    invalidateCache();
+    loadStudentDirectory(true);
+    await loadHistory(true);
+  }catch(e){ alert('Could not restore — check your internet connection and try again.'); }
+}
+async function permanentlyDeleteReceipt(receiptNumber, classMode){
+  try{
+    await api({ action:'permanentDelete', receiptNumber, classMode });
+    deletedReceipts = deletedReceipts.filter(r => r.receiptNumber !== receiptNumber);
+    invalidateCache();
+    renderBin();
   }catch(e){ alert('Could not delete — check your internet connection and try again.'); }
 }
 
@@ -1082,7 +1128,7 @@ async function loadSummary(force){
     const data = await apiGet(force);
     const online = data.online.map(normalizeReceipt);
     const offline = data.offline.map(normalizeReceipt);
-    const allReceipts = online.concat(offline);
+    const allReceipts = online.concat(offline).filter(r => !r.deleted);
     renderSummary(allReceipts, data.expenses);
   }catch(e){ body.innerHTML = '<div class="empty-note">Could not reach the sheet. <button class="icon-btn" onclick="loadSummary(true)">Retry</button></div>'; }
 }
