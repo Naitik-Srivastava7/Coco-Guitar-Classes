@@ -127,6 +127,22 @@
   .hist-row .hname{ font-weight:600; flex:1; min-width:120px; }
   .hist-row .hmeta{ color:var(--ink-soft); font-size:12px; }
   .hist-row .hamt{ font-weight:700; }
+
+  /* ---------- mobile: stack history rows so buttons never overflow ---------- */
+  body{ overflow-x:hidden; }
+  .page, .card{ min-width:0; }
+  @media (max-width: 640px){
+    .topbar{ padding:12px 14px; flex-wrap:wrap; gap:10px; }
+    .tabs{ margin-left:0; width:100%; }
+    .page{ padding:14px; }
+    .card{ padding:16px; }
+    .hist-row{ flex-wrap:wrap; row-gap:4px; column-gap:10px; }
+    .hist-row .badge{ order:0; }
+    .hist-row .hname{ order:1; flex:1 1 0; min-width:0; overflow-wrap:anywhere; }
+    .hist-row .hamt{ order:2; margin-left:auto; }
+    .hist-row .hmeta{ order:3; flex:0 0 100%; }
+    .hist-row .icon-btn{ order:4; padding:6px 12px; border:1px solid var(--line); }
+  }
   .icon-btn{ background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:13px; padding:4px 8px; border-radius:6px; }
   .icon-btn:hover{ background:var(--red-bg); color:var(--red); }
   .icon-btn.confirm-armed{ background:var(--red); color:#fff; font-weight:700; }
