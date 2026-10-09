@@ -186,6 +186,27 @@
   .kpi .klabel{ font-size:12px; color:var(--ink-soft); }
   .kpi .kval{ font-family:'Fraunces',serif; font-size:24px; font-weight:700; margin-top:4px; }
 
+  /* ---------- partner division ---------- */
+  .pgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:14px; }
+  .pcard{ text-align:left; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; cursor:pointer; font:inherit; color:inherit; }
+  .pcard.open{ border-color:var(--brass); box-shadow:0 0 0 1px var(--brass); }
+  .pcard .pname{ font-size:12.5px; color:var(--ink-soft); font-weight:600; }
+  .pcard .ptotal{ font-family:'Fraunces',serif; font-size:24px; font-weight:700; margin:2px 0 8px; }
+  .pcard .pline{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft); padding:2px 0; }
+  .pcard .phint{ font-size:11.5px; color:var(--brass); margin-top:8px; font-weight:600; }
+  .pbrief{ font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  .pdetail{ border:1px solid var(--line); border-radius:12px; padding:6px 16px; margin-bottom:18px; }
+  .pd-sec{ padding:12px 0; border-bottom:1px solid var(--line); }
+  .pd-sec:last-child{ border-bottom:none; }
+  .pd-title{ display:flex; justify-content:space-between; gap:10px; font-size:13.5px; font-weight:600; }
+  .pd-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; font-weight:400; }
+  .pd-row{ display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:6px 0 0 10px; }
+  .pd-row small{ color:var(--ink-soft); }
+  .pd-empty{ font-size:12.5px; color:var(--ink-soft); padding:6px 0 0 10px; }
+  table.summary tr.pmonth{ cursor:pointer; }
+  table.summary tr.pmonth.sel td{ background:rgba(0,0,0,0.035); }
+  table.summary td .mini{ display:block; font-size:11px; color:var(--ink-soft); font-weight:400; margin-top:2px; }
+
   @media print{
     body *{ visibility:hidden; }
     #printArea, #printArea *{ visibility:visible; }
@@ -283,6 +304,19 @@
 
       <div class="card">
         <h3>Class &amp; fee</h3>
+        <div class="field"><label>Class type</label>
+          <div class="mode-toggle">
+            <button type="button" class="active" id="ctInstitute">Institute</button>
+            <button type="button" id="ctPrivate">Private</button>
+          </div>
+        </div>
+        <div class="field" id="takenByField" style="display:none;"><label for="takenBy">Private class taken by</label>
+          <select id="takenBy">
+            <option value="">Select who took the class</option>
+            <option>Naitik Srivastava</option>
+            <option>Rohan Kumar</option>
+          </select>
+        </div>
         <div class="field" id="batchField"><label for="batch">Batch</label>
           <select id="batch">
             <option value="">Select a batch</option>
@@ -336,6 +370,7 @@
         </div>
         <div class="details" style="margin-top:14px;">
           <div class="drow" id="pBatchRow"><span class="dlabel">Batch</span><span class="dval" id="pBatch">—</span></div>
+          <div class="drow"><span class="dlabel">Class type</span><span class="dval" id="pClassType">Institute</span></div>
           <div class="drow"><span class="dlabel">Fee month</span><span class="dval" id="pFeeMonth">—</span></div>
           <div class="drow"><span class="dlabel">Fee type</span><span class="dval" id="pFeeType">—</span></div>
           <div class="drow"><span class="dlabel">Payment mode</span><span class="dval" id="pPaymentMode">—</span></div>
@@ -413,6 +448,10 @@
     <h3>Month by month</h3>
     <div id="summaryBody"><div class="empty-note">Loading…</div></div>
   </div>
+  <div class="card">
+    <h3>Naitik &amp; Rohan division</h3>
+    <div id="partnerBody"><div class="empty-note">Loading…</div></div>
+  </div>
 </div>
 
 <!-- ================= STUDENTS TAB ================= -->
@@ -463,7 +502,8 @@ let state = {
   studioName:'', instructorName:'', phone:'', currency:'₹',
   studentName:'', studentContact:'', billDate:'',
   batch:'', feeMonth:'', feeType:'', totalFee:'', amountPaid:'', paymentMode:'',
-  classMode:'Online', receiptNumber:null
+  classMode:'Online', receiptNumber:null,
+  classType:'Institute', takenBy:''
 };
 let receipts = [];
 let deletedReceipts = [];
@@ -677,7 +717,8 @@ $('waiveSaveBtn').addEventListener('click', async () => {
     action:'save', billDate: todayISO(), studentName: s.displayName, studentContact: s.phone || '',
     batch:'', feeMonth: month, feeType:'Waived', totalFee:0, amountPaid:0, due:0, paymentMode:'',
     classMode: $('waiveClassMode').value, currency: state.currency,
-    instructorName: state.instructorName || '', phone: state.phone || ''
+    instructorName: state.instructorName || '', phone: state.phone || '',
+    classType: 'Institute', takenBy: ''
   };
   try{
     await api(record);
@@ -718,6 +759,20 @@ function setMode(mode){
   renderPaper();
 }
 
+/* ---------- class type (Institute / Private) ---------- */
+function setClassType(type){
+  state.classType = type;
+  if(type !== 'Private') state.takenBy = '';
+  $('ctInstitute').classList.toggle('active', type !== 'Private');
+  $('ctPrivate').classList.toggle('active', type === 'Private');
+  $('takenByField').style.display = type === 'Private' ? 'flex' : 'none';
+  $('takenBy').value = state.takenBy || '';
+  renderPaper();
+}
+$('ctInstitute').addEventListener('click', () => setClassType('Institute'));
+$('ctPrivate').addEventListener('click', () => setClassType('Private'));
+$('takenBy').addEventListener('change', e => { state.takenBy = e.target.value; renderPaper(); });
+
 /* ---------- receipt form ---------- */
 function computeDue(){
   const total = parseFloat(state.totalFee) || 0;
@@ -731,6 +786,7 @@ function renderPaper(){
   $('pStudentContact').textContent = state.studentContact || '';
   $('pBatch').textContent = state.batch || '—';
   $('pBatchRow').style.display = state.classMode === 'Offline' ? 'none' : 'flex';
+  $('pClassType').textContent = (state.classType === 'Private') ? ('Private · ' + (state.takenBy || '—')) : 'Institute';
   $('pFeeMonth').textContent = state.feeMonth || '—';
   $('pFeeType').textContent = state.feeType || '—';
   $('pPaymentMode').textContent = state.paymentMode || '—';
@@ -768,6 +824,7 @@ $('newBtn').addEventListener('click', () => {
   state.studentName=''; state.studentContact=''; state.billDate = todayISO();
   state.batch=''; state.feeMonth=''; state.feeType=''; state.totalFee=''; state.amountPaid=''; state.paymentMode='';
   state.receiptNumber = null;
+  setClassType('Institute');
   ['studentName','studentContact','batch','feeMonth','feeType','totalFee','amountPaid','paymentMode'].forEach(k => $(k).value = '');
   $('billDate').value = state.billDate; $('receiptNo').value = '';
   $('pQrContainer').innerHTML = ''; $('qrCaption').textContent = '';
@@ -910,6 +967,7 @@ $('saveBtn').addEventListener('click', async () => {
   if(isSaving) return; // ignore extra clicks while a save is already in progress
   if(!state.studentName.trim()){ setNotice('notice','Add a student name before saving.'); return; }
   if(!state.instructorName){ setNotice('notice','Select which instructor is signing this receipt.'); return; }
+  if(state.classType === 'Private' && !state.takenBy){ setNotice('notice','Select who took this private class (Naitik or Rohan).'); return; }
   if(state.receiptNumber && !isEditingReceipt){
     const proceed = confirm('This receipt was already saved as ' + state.receiptNumber + '. Save it again as a brand new receipt?');
     if(!proceed) return;
@@ -928,7 +986,8 @@ $('saveBtn').addEventListener('click', async () => {
     batch: state.classMode === 'Offline' ? '' : state.batch, feeMonth: state.feeMonth,
     feeType: state.feeType, totalFee: state.totalFee, amountPaid: state.amountPaid, due,
     paymentMode: state.paymentMode, classMode: state.classMode, currency: state.currency,
-    instructorName: state.instructorName, phone: state.phone
+    instructorName: state.instructorName, phone: state.phone,
+    classType: state.classType, takenBy: state.classType === 'Private' ? state.takenBy : ''
   };
   if(isEditingReceipt) record.receiptNumber = state.receiptNumber;
   try{
@@ -984,6 +1043,8 @@ function editReceipt(receiptNumber, classMode){
   $('amountPaid').value = state.amountPaid;
   $('paymentMode').value = state.paymentMode;
   $('instructorName').value = state.instructorName;
+  state.takenBy = r.takenBy || '';
+  setClassType(r.classType === 'Private' ? 'Private' : 'Institute');
   setMode(r.classMode);
   setEditModeUI(true);
   setNotice('notice','Editing ' + state.receiptNumber + ' — make your changes and tap Update receipt.');
@@ -1011,7 +1072,8 @@ function normalizeReceipt(r){
     receiptNumber: r.ReceiptNo, billDate: r.Date, studentName: r.StudentName, studentContact: r.StudentContact,
     batch: r.Batch, feeMonth: r.FeeMonth, feeType: r.FeeType, totalFee: r.TotalFee, amountPaid: r.AmountPaid, due: r.Due,
     paymentMode: r.PaymentMode, currency: r.Currency || '₹', instructorName: r.Instructor, phone: r.Phone,
-    deleted: r.Deleted || ''
+    deleted: r.Deleted || '',
+    classType: r.ClassType === 'Private' ? 'Private' : 'Institute', takenBy: r.TaughtBy || ''
   };
 }
 // A visible, in-app two-tap confirmation for destructive actions: first
@@ -1058,7 +1120,7 @@ function renderHistory(){
       <div class="hist-row">
         <span class="badge ${r.classMode.toLowerCase()}">${r.classMode}</span>
         <span class="hname">${escapeHtml(r.studentName)||'—'}${r.feeType==='Waived' ? ' (waived)' : ''}</span>
-        <span class="hmeta">${formatDate(r.billDate)} · ${escapeHtml(r.batch)||(r.classMode==='Offline'?'Offline class':'—')}${r.feeMonth ? ' · ' + escapeHtml(r.feeMonth) : ''}</span>
+        <span class="hmeta">${formatDate(r.billDate)} · ${escapeHtml(r.batch)||(r.classMode==='Offline'?'Offline class':'—')}${r.feeMonth ? ' · ' + escapeHtml(r.feeMonth) : ''}${r.classType==='Private' ? ' · Private (' + escapeHtml(String(r.takenBy).split(' ')[0]) + ')' : ''}</span>
         <span class="hamt num">${r.currency}${(parseFloat(r.amountPaid)||0).toFixed(0)}</span>
         <button class="icon-btn" data-edit="${r.receiptNumber}" data-mode="${r.classMode}" title="Edit">Edit</button>
         <button class="icon-btn" data-del="${r.receiptNumber}" data-mode="${r.classMode}" title="Delete">Delete</button>
@@ -1208,6 +1270,161 @@ function renderSummary(allReceipts, expenses){
   const netProfit = totalIncome - totalExpense;
   $('kProfit').textContent = '₹' + netProfit.toFixed(0);
   $('kProfit').style.color = netProfit >= 0 ? 'var(--green)' : 'var(--red)';
+  renderPartnerSplit(allReceipts, expenses);
+}
+
+/* ---------- partner division ----------
+   Institute receipts minus ALL expenses = institute profit, split 50-50.
+   Private receipts split 80% to whoever took the class, 20% to the other.
+   Old receipts with no class type count as Institute. */
+const PARTNERS = ['Naitik Srivastava', 'Rohan Kumar'];
+let partnerData = { receipts:[], expenses:[] };
+let partnerView = { period:'all', open:null };
+
+function fmtInr(n){
+  const v = Math.round(n * 100) / 100;
+  return (v < 0 ? '−' : '') + '₹' + Math.abs(v).toLocaleString('en-IN', { maximumFractionDigits:2 });
+}
+function firstName(n){ return String(n).split(' ')[0]; }
+
+function computeSplit(receipts, expenses, period){
+  const inPeriod = d => period === 'all' || monthKey(d) === period;
+  const out = { instituteIncome:0, expenseTotal:0, privateIncome:0, pool:0, partners:{} };
+  PARTNERS.forEach(n => out.partners[n] = { institute:0, own:[], other:[], ownTotal:0, otherTotal:0, total:0 });
+  receipts.forEach(r => {
+    if(!inPeriod(r.billDate)) return;
+    const amt = parseFloat(r.amountPaid) || 0;
+    if(r.classType === 'Private' && PARTNERS.indexOf(r.takenBy) !== -1){
+      const owner = r.takenBy, other = PARTNERS.find(n => n !== owner);
+      out.privateIncome += amt;
+      if(amt === 0) return;
+      out.partners[owner].own.push({ name:r.studentName, month:r.feeMonth, paid:amt, share:amt * 0.8 });
+      out.partners[other].other.push({ name:r.studentName, month:r.feeMonth, paid:amt, share:amt * 0.2, by:owner });
+    }else{
+      out.instituteIncome += amt;
+    }
+  });
+  expenses.forEach(e => { if(inPeriod(e.Date)) out.expenseTotal += parseFloat(e.Amount) || 0; });
+  out.pool = out.instituteIncome - out.expenseTotal;
+  PARTNERS.forEach(n => {
+    const p = out.partners[n];
+    p.institute = out.pool / 2;
+    p.ownTotal = p.own.reduce((t, x) => t + x.share, 0);
+    p.otherTotal = p.other.reduce((t, x) => t + x.share, 0);
+    p.total = p.institute + p.ownTotal + p.otherTotal;
+  });
+  return out;
+}
+
+function groupByStudent(list){
+  const g = {};
+  list.forEach(x => {
+    const key = String(x.name || '—').trim().toLowerCase();
+    if(!g[key]) g[key] = { name:x.name || '—', months:[], paid:0, share:0 };
+    g[key].paid += x.paid; g[key].share += x.share;
+    const m = String(x.month || '').trim();
+    if(m && g[key].months.indexOf(m) === -1) g[key].months.push(m);
+  });
+  return Object.values(g).sort((a, b) => b.share - a.share);
+}
+function studentRows(list){
+  if(!list.length) return '<div class="pd-empty">None in this period.</div>';
+  return groupByStudent(list).map(g => `
+    <div class="pd-row">
+      <span>${escapeHtml(g.name)}<br><small>${g.months.length ? escapeHtml(g.months.join(', ')) + ' · ' : ''}paid ${fmtInr(g.paid)}</small></span>
+      <span class="num">${fmtInr(g.share)}</span>
+    </div>`).join('');
+}
+
+function setPartnerPeriod(v){ partnerView.period = v; renderPartnerView(); }
+function togglePartner(i){
+  const n = PARTNERS[i];
+  partnerView.open = (partnerView.open === n) ? null : n;
+  renderPartnerView();
+}
+
+function renderPartnerSplit(receipts, expenses){
+  partnerData = { receipts, expenses };
+  renderPartnerView();
+}
+
+function renderPartnerView(){
+  const { receipts, expenses } = partnerData;
+  const monthMap = {};
+  receipts.forEach(r => { monthMap[monthKey(r.billDate)] = monthLabel(r.billDate); });
+  expenses.forEach(e => { monthMap[monthKey(e.Date)] = monthLabel(e.Date); });
+  const monthKeys = Object.keys(monthMap).sort().reverse();
+  if(!monthKeys.length){
+    $('partnerBody').innerHTML = '<div class="empty-note">No data yet — save a receipt or an expense first.</div>';
+    return;
+  }
+  if(partnerView.period !== 'all' && !monthMap[partnerView.period]) partnerView.period = 'all';
+
+  const period = partnerView.period;
+  const periodLabel = period === 'all' ? 'All time' : monthMap[period];
+  const sp = computeSplit(receipts, expenses, period);
+  const cls = v => v >= 0 ? 'profit-pos' : 'profit-neg';
+
+  const options = ['<option value="all"' + (period === 'all' ? ' selected' : '') + '>All time</option>']
+    .concat(monthKeys.map(k => `<option value="${k}"${k === period ? ' selected' : ''}>${monthMap[k]}</option>`)).join('');
+
+  const cards = PARTNERS.map((n, i) => {
+    const p = sp.partners[n];
+    return `<button type="button" class="pcard${partnerView.open === n ? ' open' : ''}" onclick="togglePartner(${i})">
+      <div class="pname">${escapeHtml(n)}</div>
+      <div class="ptotal ${cls(p.total)}">${fmtInr(p.total)}</div>
+      <div class="pline"><span>Institute 50%</span><span>${fmtInr(p.institute)}</span></div>
+      <div class="pline"><span>Own private 80%</span><span>${fmtInr(p.ownTotal)}</span></div>
+      <div class="pline"><span>Other's private 20%</span><span>${fmtInr(p.otherTotal)}</span></div>
+      <div class="phint">${partnerView.open === n ? 'Hide details ▲' : 'Tap for details ▼'}</div>
+    </button>`;
+  }).join('');
+
+  let detail = '';
+  if(partnerView.open){
+    const n = partnerView.open;
+    const other = PARTNERS.find(x => x !== n);
+    const p = sp.partners[n];
+    detail = `<div class="pdetail">
+      <div class="pd-sec">
+        <div class="pd-title"><span>${escapeHtml(n)} · ${escapeHtml(periodLabel)}</span><span class="num ${cls(p.total)}">${fmtInr(p.total)}</span></div>
+      </div>
+      <div class="pd-sec">
+        <div class="pd-title"><span>Institute profit · 50%<div class="pd-sub">${fmtInr(sp.instituteIncome)} institute income − ${fmtInr(sp.expenseTotal)} expenses = ${fmtInr(sp.pool)}, half</div></span><span class="num">${fmtInr(p.institute)}</span></div>
+      </div>
+      <div class="pd-sec">
+        <div class="pd-title"><span>Students taught by ${escapeHtml(firstName(n))} · 80%</span><span class="num">${fmtInr(p.ownTotal)}</span></div>
+        ${studentRows(p.own)}
+      </div>
+      <div class="pd-sec">
+        <div class="pd-title"><span>Students taught by ${escapeHtml(firstName(other))} · ${escapeHtml(firstName(n))}'s 20%</span><span class="num">${fmtInr(p.otherTotal)}</span></div>
+        ${studentRows(p.other)}
+      </div>
+    </div>`;
+  }
+
+  const monthRows = monthKeys.map(k => {
+    const m = computeSplit(receipts, expenses, k);
+    const cells = PARTNERS.map(n => {
+      const p = m.partners[n];
+      return `<td class="num"><span class="${cls(p.total)}" style="font-weight:700;">${fmtInr(p.total)}</span>
+        <span class="mini">50% ${fmtInr(p.institute)} · 80% ${fmtInr(p.ownTotal)} · 20% ${fmtInr(p.otherTotal)}</span></td>`;
+    }).join('');
+    return `<tr class="pmonth${k === period ? ' sel' : ''}" onclick="setPartnerPeriod('${k}')" title="Show this month above"><td>${monthMap[k]}</td>${cells}</tr>`;
+  }).join('');
+
+  $('partnerBody').innerHTML = `
+    <div class="field" style="max-width:220px;"><label for="partnerPeriod">Period</label>
+      <select id="partnerPeriod" onchange="setPartnerPeriod(this.value)">${options}</select>
+    </div>
+    <div class="pbrief">Institute profit ${fmtInr(sp.pool)} → ${fmtInr(sp.pool / 2)} each · Private income ${fmtInr(sp.privateIncome)} split 80-20</div>
+    <div class="pgrid">${cards}</div>
+    ${detail}
+    <h3 style="margin:6px 0 10px; font-size:13.5px;">Month by month</h3>
+    <table class="summary">
+      <tr><th>Month</th><th>${escapeHtml(firstName(PARTNERS[0]))}</th><th>${escapeHtml(firstName(PARTNERS[1]))}</th></tr>
+      ${monthRows}
+    </table>`;
 }
 
 /* ---------- init ---------- */
