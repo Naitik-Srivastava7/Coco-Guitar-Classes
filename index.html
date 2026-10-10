@@ -532,6 +532,19 @@ function escapeHtml(v){ const s = (v===null||v===undefined) ? '' : String(v); re
 let studentDirectory = {};
 let currentStudentKey = null;
 
+// Newest receipt first. Bill date decides, but when two receipts share a
+// bill date (or a date can't be read) the higher receipt number — i.e. the
+// one saved later — wins. Without this tie-break, the sort could leave the
+// OLDER receipt on top and the student list would show its fee month.
+function compareReceiptsNewestFirst(a, b){
+  const da = new Date(a.billDate).getTime(), db = new Date(b.billDate).getTime();
+  const ta = isNaN(da) ? -Infinity : da, tb = isNaN(db) ? -Infinity : db;
+  if(ta !== tb) return tb > ta ? 1 : -1;
+  const na = parseInt(String(a.receiptNumber || '').replace(/\D/g, ''), 10) || 0;
+  const nb = parseInt(String(b.receiptNumber || '').replace(/\D/g, ''), 10) || 0;
+  return nb - na;
+}
+
 function buildStudentDirectory(onlineRows, offlineRows){
   const dir = {};
   function ingest(rows, classMode){
@@ -552,13 +565,23 @@ function buildStudentDirectory(onlineRows, offlineRows){
   ingest(onlineRows, 'Online');
   ingest(offlineRows, 'Offline');
   Object.values(dir).forEach(s => {
-    s.receipts.sort((a,b) => new Date(b.billDate) - new Date(a.billDate));
+    s.receipts.sort(compareReceiptsNewestFirst);
     const withPhone = s.receipts.find(r => r.studentContact && String(r.studentContact).trim());
     s.phone = withPhone ? withPhone.studentContact : '';
     // A waived month is just as "settled" as a paid one — so the most
     // recent receipt with a fee month, paid or waived, is what "next
     // month" should be suggested from.
-    const lastRec = s.receipts.find(r => r.feeMonth);
+    // "Last paid" is the receipt covering the latest MONTH, not simply the
+    // latest bill date — a student can pay September on the 18th and then
+    // August on the 19th. Ties go to the newer receipt (list is newest-first).
+    let best = null;
+    s.receipts.forEach(r => {
+      if(!r.feeMonth) return;
+      const abs = resolveFeeMonthAbs(r.feeMonth, r.billDate);
+      if(abs === null) return;
+      if(best === null || abs > best.abs) best = { abs, rec: r };
+    });
+    const lastRec = best ? best.rec : s.receipts.find(r => r.feeMonth);
     s.lastFeeMonth = lastRec ? lastRec.feeMonth : '';
     s.lastFeeMonthWaived = lastRec ? lastRec.feeType === 'Waived' : false;
     s.lastClassMode = s.receipts[0] ? s.receipts[0].classMode : 'Online';
@@ -596,8 +619,8 @@ async function loadStudentDirectory(force){
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 // "May" -> suggest June. "May–July" or "May, June, July" -> take whichever
 // month is mentioned last in the text, and suggest the one after that.
-function guessNextMonth(text){
-  if(!text) return '';
+function lastMonthIdxInText(text){
+  if(!text) return -1;
   text = String(text);
   let lastIdx = -1, lastPos = -1;
   MONTH_NAMES.forEach((m, idx) => {
@@ -605,8 +628,29 @@ function guessNextMonth(text){
     const found = text.match(re);
     if(found && found.index > lastPos){ lastPos = found.index; lastIdx = idx; }
   });
-  if(lastIdx === -1) return '';
-  return MONTH_NAMES[(lastIdx + 1) % 12];
+  return lastIdx;
+}
+function guessNextMonth(text){
+  const idx = lastMonthIdxInText(text);
+  return idx === -1 ? '' : MONTH_NAMES[(idx + 1) % 12];
+}
+// Turns a fee month ("August", "May–July") plus the date it was billed on
+// into one comparable number (year*12 + month), picking whichever year puts
+// that month closest to the bill date. This lets us tell which receipt
+// covers the LATEST month even when receipts were billed out of order,
+// and it still works across December -> January.
+function resolveFeeMonthAbs(feeMonthText, billDate){
+  const idx = lastMonthIdxInText(feeMonthText);
+  const d = new Date(billDate);
+  if(idx === -1 || isNaN(d)) return null;
+  const base = d.getFullYear() * 12 + d.getMonth();
+  let bestAbs = null, bestDiff = Infinity;
+  [-1, 0, 1].forEach(dy => {
+    const abs = (d.getFullYear() + dy) * 12 + idx;
+    const diff = Math.abs(abs - base);
+    if(diff < bestDiff || (diff === bestDiff && abs < bestAbs)){ bestDiff = diff; bestAbs = abs; }
+  });
+  return bestAbs;
 }
 
 // When the typed name exactly matches a known student, quietly fill in
