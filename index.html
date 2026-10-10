@@ -207,6 +207,19 @@
   table.summary tr.pmonth.sel td{ background:rgba(0,0,0,0.035); }
   table.summary td .mini{ display:block; font-size:11px; color:var(--ink-soft); font-weight:400; margin-top:2px; }
 
+  /* ---------- attendance ---------- */
+  .att-row{ display:flex; align-items:center; gap:12px; padding:11px 14px; margin-bottom:8px; border:1px solid var(--line); border-radius:12px; cursor:pointer; background:var(--card); }
+  .att-row.on{ background:var(--brass-bg); border-color:var(--brass); }
+  .att-row input{ width:20px; height:20px; padding:0; border:none; accent-color:var(--brass); flex:none; margin:0; }
+  .att-name{ font-weight:600; font-size:14px; }
+  .att-sub{ font-size:11.5px; color:var(--ink-soft); }
+  .att-hist{ border:1px solid var(--line); border-radius:12px; margin-bottom:8px; overflow:hidden; }
+  .att-hist-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; font-size:14px; font-weight:600; }
+  .att-hist-head small{ font-weight:400; color:var(--ink-soft); }
+  .att-hist-body{ padding:4px 14px 12px; border-top:1px solid var(--line); font-size:13px; }
+  .att-hist-body .arow{ display:flex; justify-content:space-between; gap:10px; padding:6px 0; }
+  .att-hist-body small{ color:var(--ink-soft); }
+
   @media print{
     body *{ visibility:hidden; }
     #printArea, #printArea *{ visibility:visible; }
@@ -250,6 +263,7 @@
   </div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="receipt">New receipt</button>
+    <button class="tab-btn" data-tab="attendance">Attendance</button>
     <button class="tab-btn" data-tab="history">History</button>
     <button class="tab-btn" data-tab="expenses">Expenses</button>
     <button class="tab-btn" data-tab="summary">Summary</button>
@@ -334,8 +348,18 @@
             <option>Entry fee</option><option>Monthly fee</option><option>Entry + Monthly</option><option>Pending fee</option>
           </select>
         </div>
+        <div class="field"><label>Billing</label>
+          <div class="mode-toggle">
+            <button type="button" class="active" id="bbFixed">Fixed fee</button>
+            <button type="button" id="bbPerClass">Per class</button>
+          </div>
+        </div>
+        <div class="row2" id="perClassFields" style="display:none;">
+          <div class="field"><label for="classCount">Total classes</label><input id="classCount" type="number" min="0" step="1" placeholder="0"></div>
+          <div class="field"><label for="classRate">Fee per class</label><input id="classRate" type="number" min="0" step="1" placeholder="0"></div>
+        </div>
         <div class="row2">
-          <div class="field"><label for="totalFee">Total batch fee</label><input id="totalFee" type="number" min="0" step="1" placeholder="0"></div>
+          <div class="field"><label for="totalFee" id="totalFeeLabel">Total batch fee</label><input id="totalFee" type="number" min="0" step="1" placeholder="0"></div>
           <div class="field"><label for="amountPaid">Amount paid</label><input id="amountPaid" type="number" min="0" step="1" placeholder="0"></div>
         </div>
         <div class="field"><label for="paymentMode">Payment mode</label>
@@ -377,6 +401,7 @@
         </div>
         <div class="totals">
           <table>
+            <tr id="pPerClassRow" style="display:none;"><td class="label">Classes</td><td id="pPerClass">—</td></tr>
             <tr><td class="label">Total batch fee</td><td id="pTotalFee">0.00</td></tr>
             <tr><td class="label">Amount paid</td><td id="pAmountPaid">0.00</td></tr>
             <tr class="grand" id="pDueRow"><td>Due</td><td id="pDue">0.00</td></tr>
@@ -454,6 +479,41 @@
   </div>
 </div>
 
+<!-- ================= ATTENDANCE TAB ================= -->
+<div class="page" id="page-attendance">
+  <div class="card">
+    <h3>Mark attendance</h3>
+    <div class="row2">
+      <div class="field"><label for="attDate">Date</label><input id="attDate" type="date"></div>
+      <div class="field"><label for="attFilter">Show</label>
+        <select id="attFilter"><option value="All">All students</option><option value="Online">Online</option><option value="Offline">Offline</option></select>
+      </div>
+    </div>
+    <input type="text" id="attSearch" placeholder="Search students…" style="margin-bottom:12px;">
+    <div id="attList"><div class="empty-note">Loading…</div></div>
+    <button class="btn-ghost" id="attAddToggle" type="button" style="margin-top:6px;">+ Add student</button>
+    <div id="attAddForm" style="display:none; margin-top:12px;">
+      <div class="field"><label for="attNewName">Student name</label><input id="attNewName" type="text" placeholder="Student's name" autocomplete="off"></div>
+      <div class="row2">
+        <div class="field"><label for="attNewMode">Class mode</label><select id="attNewMode"><option>Offline</option><option>Online</option></select></div>
+        <div class="field"><label for="attNewContact">Contact (optional)</label><input id="attNewContact" type="text" placeholder="phone"></div>
+      </div>
+      <button class="btn-primary" id="attAddBtn" type="button">Add &amp; tick</button>
+    </div>
+    <div id="attCount" style="font-size:12.5px; color:var(--ink-soft); margin:14px 0 8px;"></div>
+    <button class="btn-primary" id="attSaveBtn" type="button">Save attendance</button>
+    <div class="notice" id="attNotice"></div>
+  </div>
+  <div class="card">
+    <h3>Attendance history</h3>
+    <div class="mode-toggle" style="margin-bottom:14px;">
+      <button type="button" class="active" id="attByDate">By date</button>
+      <button type="button" id="attByStudent">By student</button>
+    </div>
+    <div id="attHistory"><div class="empty-note">Loading…</div></div>
+  </div>
+</div>
+
 <!-- ================= STUDENTS TAB ================= -->
 <div class="page" id="page-students">
   <div class="card" id="dueCard">
@@ -503,7 +563,8 @@ let state = {
   studentName:'', studentContact:'', billDate:'',
   batch:'', feeMonth:'', feeType:'', totalFee:'', amountPaid:'', paymentMode:'',
   classMode:'Online', receiptNumber:null,
-  classType:'Institute', takenBy:''
+  classType:'Institute', takenBy:'',
+  billing:'Fixed', classCount:'', classRate:''
 };
 let receipts = [];
 let deletedReceipts = [];
@@ -784,6 +845,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if(btn.dataset.tab === 'history') loadHistory();
     if(btn.dataset.tab === 'expenses') loadExpenses();
     if(btn.dataset.tab === 'summary') loadSummary();
+    if(btn.dataset.tab === 'attendance') loadAttendance(true);
     if(btn.dataset.tab === 'students'){
       $('studentDetailCard').style.display = 'none';
       $('studentsListCard').style.display = 'block';
@@ -837,6 +899,9 @@ function renderPaper(){
   $('pModeBadge').textContent = state.classMode;
   $('pModeBadge').className = 'badge ' + (state.classMode === 'Online' ? 'online' : 'offline');
 
+  const isPer = state.billing === 'Per class';
+  $('pPerClassRow').style.display = isPer ? '' : 'none';
+  if(isPer) $('pPerClass').textContent = (state.classCount || 0) + ' × ' + money(state.currency, parseFloat(state.classRate) || 0);
   const total = parseFloat(state.totalFee) || 0;
   const paid = parseFloat(state.amountPaid) || 0;
   const due = computeDue();
@@ -862,6 +927,30 @@ function bindField(id, key){
 }
 ['studioName','instructorName','phone','currency','studentContact','billDate','batch','feeMonth','feeType','totalFee','amountPaid','paymentMode'].forEach(k => bindField(k,k));
 
+/* ---------- billing basis (fixed fee / per class) ---------- */
+function setBilling(type){
+  const isPer = type === 'Per class';
+  state.billing = isPer ? 'Per class' : 'Fixed';
+  if(!isPer){ state.classCount = ''; state.classRate = ''; }
+  $('bbFixed').classList.toggle('active', !isPer);
+  $('bbPerClass').classList.toggle('active', isPer);
+  $('perClassFields').style.display = isPer ? '' : 'none';
+  $('classCount').value = state.classCount; $('classRate').value = state.classRate;
+  $('totalFee').readOnly = isPer;
+  $('totalFeeLabel').textContent = isPer ? 'Total fee (classes × rate)' : 'Total batch fee';
+}
+function recalcPerClass(){
+  if(state.billing === 'Per class'){
+    const t = (parseFloat(state.classCount) || 0) * (parseFloat(state.classRate) || 0);
+    state.totalFee = t > 0 ? String(Math.round(t * 100) / 100) : '';
+    $('totalFee').value = state.totalFee;
+  }
+  renderPaper();
+}
+$('bbFixed').addEventListener('click', () => { setBilling('Fixed'); renderPaper(); });
+$('bbPerClass').addEventListener('click', () => { setBilling('Per class'); recalcPerClass(); });
+['classCount','classRate'].forEach(id => $(id).addEventListener('input', e => { state[id] = e.target.value; recalcPerClass(); }));
+
 function setNotice(id, msg, ok){ const el = $(id); el.textContent = msg; el.className = 'notice' + (ok ? ' ok' : ''); }
 
 $('newBtn').addEventListener('click', () => {
@@ -869,6 +958,7 @@ $('newBtn').addEventListener('click', () => {
   state.batch=''; state.feeMonth=''; state.feeType=''; state.totalFee=''; state.amountPaid=''; state.paymentMode='';
   state.receiptNumber = null;
   setClassType('Institute');
+  setBilling('Fixed');
   ['studentName','studentContact','batch','feeMonth','feeType','totalFee','amountPaid','paymentMode'].forEach(k => $(k).value = '');
   $('billDate').value = state.billDate; $('receiptNo').value = '';
   $('pQrContainer').innerHTML = ''; $('qrCaption').textContent = '';
@@ -1011,6 +1101,7 @@ $('saveBtn').addEventListener('click', async () => {
   if(isSaving) return; // ignore extra clicks while a save is already in progress
   if(!state.studentName.trim()){ setNotice('notice','Add a student name before saving.'); return; }
   if(!state.instructorName){ setNotice('notice','Select which instructor is signing this receipt.'); return; }
+  if(state.billing === 'Per class' && (!(parseFloat(state.classCount) > 0) || !(parseFloat(state.classRate) > 0))){ setNotice('notice','Enter the total classes and the fee per class.'); return; }
   if(state.classType === 'Private' && !state.takenBy){ setNotice('notice','Select who took this private class (Naitik or Rohan).'); return; }
   if(state.receiptNumber && !isEditingReceipt){
     const proceed = confirm('This receipt was already saved as ' + state.receiptNumber + '. Save it again as a brand new receipt?');
@@ -1031,7 +1122,8 @@ $('saveBtn').addEventListener('click', async () => {
     feeType: state.feeType, totalFee: state.totalFee, amountPaid: state.amountPaid, due,
     paymentMode: state.paymentMode, classMode: state.classMode, currency: state.currency,
     instructorName: state.instructorName, phone: state.phone,
-    classType: state.classType, takenBy: state.classType === 'Private' ? state.takenBy : ''
+    classType: state.classType, takenBy: state.classType === 'Private' ? state.takenBy : '',
+    billing: state.billing, classCount: state.billing === 'Per class' ? state.classCount : '', classRate: state.billing === 'Per class' ? state.classRate : ''
   };
   if(isEditingReceipt) record.receiptNumber = state.receiptNumber;
   try{
@@ -1088,6 +1180,8 @@ function editReceipt(receiptNumber, classMode){
   $('paymentMode').value = state.paymentMode;
   $('instructorName').value = state.instructorName;
   state.takenBy = r.takenBy || '';
+  state.classCount = r.classCount || ''; state.classRate = r.classRate || '';
+  setBilling(r.billing === 'Per class' ? 'Per class' : 'Fixed');
   setClassType(r.classType === 'Private' ? 'Private' : 'Institute');
   setMode(r.classMode);
   setEditModeUI(true);
@@ -1117,7 +1211,8 @@ function normalizeReceipt(r){
     batch: r.Batch, feeMonth: r.FeeMonth, feeType: r.FeeType, totalFee: r.TotalFee, amountPaid: r.AmountPaid, due: r.Due,
     paymentMode: r.PaymentMode, currency: r.Currency || '₹', instructorName: r.Instructor, phone: r.Phone,
     deleted: r.Deleted || '',
-    classType: r.ClassType === 'Private' ? 'Private' : 'Institute', takenBy: r.TaughtBy || ''
+    classType: r.ClassType === 'Private' ? 'Private' : 'Institute', takenBy: r.TaughtBy || '',
+    billing: r.Billing === 'Per class' ? 'Per class' : 'Fixed', classCount: r.Classes || '', classRate: r.PerClassFee || ''
   };
 }
 // A visible, in-app two-tap confirmation for destructive actions: first
@@ -1470,6 +1565,164 @@ function renderPartnerView(){
       ${monthRows}
     </table>`;
 }
+
+/* ---------- attendance ----------
+   Saved to an "Attendance" sheet, one row per student per day. Only dates
+   that actually have attendance saved ever show up in the history. */
+let attRows = [];
+let att = { date:'', ticked:{}, extras:{}, filter:'All', view:'date', open:null };
+function localTodayISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function attKey(n){ return String(n || '').trim().toLowerCase(); }
+function attRowDate(r){ return String(r.Date || '').slice(0, 10); }
+function attDateLabel(iso){
+  const d = new Date(iso + 'T00:00:00');
+  return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+}
+function attStudents(){
+  const map = {};
+  Object.values(studentDirectory).forEach(s => {
+    map[attKey(s.displayName)] = { name:s.displayName, mode:s.lastClassMode || 'Online', contact:s.phone || '' };
+  });
+  attRows.forEach(r => {
+    const k = attKey(r.StudentName);
+    if(k && !map[k]) map[k] = { name:r.StudentName, mode:r.ClassMode || 'Offline', contact:r.Contact || '' };
+  });
+  Object.keys(att.extras).forEach(k => { if(!map[k]) map[k] = att.extras[k]; });
+  return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
+}
+function loadTicksForDate(){
+  att.ticked = {};
+  attRows.forEach(r => { if(attRowDate(r) === att.date) att.ticked[attKey(r.StudentName)] = true; });
+}
+async function loadAttendance(force){
+  if(!att.date) att.date = localTodayISO();
+  $('attDate').value = att.date;
+  try{
+    const data = await apiGet(force);
+    studentDirectory = buildStudentDirectory(data.online, data.offline);
+    if(!Array.isArray(data.attendance)){
+      $('attList').innerHTML = '<div class="empty-note">Attendance isn\'t set up yet — update the Google Apps Script to v9 first.</div>';
+      $('attHistory').innerHTML = '';
+      return;
+    }
+    attRows = data.attendance;
+    loadTicksForDate();
+    renderAttList();
+    renderAttHistory();
+  }catch(e){
+    $('attList').innerHTML = '<div class="empty-note">Could not load students — ' + escapeHtml(e.message || String(e)) + '. <button class="icon-btn" onclick="loadAttendance(true)">Retry</button></div>';
+  }
+}
+function updateAttCount(){
+  const n = Object.keys(att.ticked).filter(k => att.ticked[k]).length;
+  $('attCount').textContent = n + ' marked present on ' + attDateLabel(att.date);
+}
+function renderAttList(){
+  const q = $('attSearch').value.trim().toLowerCase();
+  const list = attStudents().filter(s => (att.filter === 'All' || s.mode === att.filter) && (!q || s.name.toLowerCase().includes(q)));
+  $('attList').innerHTML = list.length ? list.map(s => {
+    const k = attKey(s.name), on = !!att.ticked[k];
+    return `<label class="att-row${on ? ' on' : ''}"><input type="checkbox" data-k="${escapeHtml(k)}"${on ? ' checked' : ''}><div><div class="att-name">${escapeHtml(s.name)}</div><div class="att-sub">${escapeHtml(s.mode)}</div></div></label>`;
+  }).join('') : '<div class="empty-note">No students found.</div>';
+  updateAttCount();
+}
+function renderAttHistory(){
+  $('attByDate').classList.toggle('active', att.view === 'date');
+  $('attByStudent').classList.toggle('active', att.view === 'student');
+  if(!attRows.length){ $('attHistory').innerHTML = '<div class="empty-note">No attendance saved yet.</div>'; return; }
+  const head = (id, title, sub) => `<div class="att-hist-head" data-id="${escapeHtml(id)}"><span>${title}</span><small>${sub} ${att.open === id ? '▲' : '▼'}</small></div>`;
+  let html = '';
+  if(att.view === 'date'){
+    const byDate = {};
+    attRows.forEach(r => { const d = attRowDate(r); if(d) (byDate[d] = byDate[d] || []).push(r); });
+    html = Object.keys(byDate).sort().reverse().map(d => {
+      const rows = byDate[d].slice().sort((a, b) => String(a.StudentName).localeCompare(String(b.StudentName)));
+      const id = 'd:' + d;
+      const body = att.open !== id ? '' : `<div class="att-hist-body">${rows.map(r => `<div class="arow"><span>${escapeHtml(r.StudentName)}</span><small>${escapeHtml(r.ClassMode || '')}</small></div>`).join('')}<div style="padding-top:8px;"><button class="icon-btn" style="border:1px solid var(--line);" data-edit="${d}">Edit this day</button></div></div>`;
+      return `<div class="att-hist">${head(id, attDateLabel(d), rows.length + ' present')}${body}</div>`;
+    }).join('');
+  }else{
+    const byStu = {};
+    attRows.forEach(r => {
+      const k = attKey(r.StudentName);
+      if(!k) return;
+      if(!byStu[k]) byStu[k] = { name:r.StudentName, dates:[] };
+      byStu[k].dates.push(attRowDate(r));
+    });
+    html = Object.keys(byStu).sort((a, b) => byStu[a].name.localeCompare(byStu[b].name)).map(k => {
+      const st = byStu[k], dates = st.dates.slice().sort().reverse(), id = 's:' + k;
+      const body = att.open !== id ? '' : `<div class="att-hist-body">${dates.map(d => `<div class="arow"><span>${attDateLabel(d)}</span></div>`).join('')}</div>`;
+      return `<div class="att-hist">${head(id, escapeHtml(st.name), dates.length + (dates.length === 1 ? ' class' : ' classes'))}${body}</div>`;
+    }).join('');
+  }
+  $('attHistory').innerHTML = html;
+}
+function editAttDate(d){
+  att.date = d; $('attDate').value = d;
+  loadTicksForDate(); renderAttList();
+  window.scrollTo(0, 0);
+  setNotice('attNotice', 'Editing ' + attDateLabel(d) + ' — tick or untick, then save.', true);
+}
+$('attDate').addEventListener('change', e => { att.date = e.target.value || localTodayISO(); loadTicksForDate(); renderAttList(); setNotice('attNotice', '', false); });
+$('attFilter').addEventListener('change', e => { att.filter = e.target.value; renderAttList(); });
+$('attSearch').addEventListener('input', renderAttList);
+$('attList').addEventListener('change', e => {
+  const k = e.target.dataset ? e.target.dataset.k : undefined;
+  if(k === undefined) return;
+  if(e.target.checked) att.ticked[k] = true; else delete att.ticked[k];
+  e.target.closest('.att-row').classList.toggle('on', e.target.checked);
+  updateAttCount();
+});
+$('attAddToggle').addEventListener('click', () => {
+  const f = $('attAddForm');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+});
+$('attAddBtn').addEventListener('click', () => {
+  const name = $('attNewName').value.trim();
+  if(!name){ setNotice('attNotice', "Type the student's name first.", false); return; }
+  const k = attKey(name);
+  if(!attStudents().some(s => attKey(s.name) === k)){
+    att.extras[k] = { name, mode:$('attNewMode').value, contact:$('attNewContact').value.trim() };
+  }
+  att.ticked[k] = true;
+  $('attNewName').value = ''; $('attNewContact').value = '';
+  $('attAddForm').style.display = 'none';
+  att.filter = 'All'; $('attFilter').value = 'All'; $('attSearch').value = '';
+  setNotice('attNotice', name + ' added and ticked — save to keep it.', true);
+  renderAttList();
+});
+$('attSaveBtn').addEventListener('click', async () => {
+  const map = {};
+  attStudents().forEach(s => { map[attKey(s.name)] = s; });
+  const entries = Object.keys(att.ticked).filter(k => att.ticked[k] && map[k]).map(k => ({ name:map[k].name, classMode:map[k].mode, contact:map[k].contact }));
+  const btn = $('attSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    await api({ action:'saveAttendance', date:att.date, entries });
+    invalidateCache();
+    const data = await apiGet(true);
+    attRows = data.attendance || [];
+    att.extras = {};
+    loadTicksForDate();
+    renderAttList(); renderAttHistory();
+    setNotice('attNotice', entries.length ? ('Saved — ' + entries.length + ' present on ' + attDateLabel(att.date) + '.') : ('Attendance cleared for ' + attDateLabel(att.date) + '.'), true);
+  }catch(e){
+    setNotice('attNotice', 'Could not save: ' + (e.message || e), false);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Save attendance';
+  }
+});
+$('attByDate').addEventListener('click', () => { att.view = 'date'; att.open = null; renderAttHistory(); });
+$('attByStudent').addEventListener('click', () => { att.view = 'student'; att.open = null; renderAttHistory(); });
+$('attHistory').addEventListener('click', e => {
+  const ed = e.target.closest('[data-edit]');
+  if(ed){ editAttDate(ed.dataset.edit); return; }
+  const h = e.target.closest('.att-hist-head');
+  if(h){ att.open = (att.open === h.dataset.id) ? null : h.dataset.id; renderAttHistory(); }
+});
 
 /* ---------- init ---------- */
 /* ---------- login gate ---------- */
