@@ -489,6 +489,9 @@
         <select id="attFilter"><option value="All">All students</option><option value="Online">Online</option><option value="Offline">Offline</option></select>
       </div>
     </div>
+    <label class="att-row" id="attClosedRow"><input type="checkbox" id="attClosed"><div><div class="att-name">Class closed</div><div class="att-sub">Tick if there was no class on this date</div></div></label>
+    <div class="field" id="attReasonField" style="display:none;"><label for="attReason">Reason for closing</label><input id="attReason" type="text" placeholder="e.g. Diwali holiday, teacher unwell"></div>
+    <div id="attStudentsBlock">
     <input type="text" id="attSearch" placeholder="Search students…" style="margin-bottom:12px;">
     <div id="attList"><div class="empty-note">Loading…</div></div>
     <button class="btn-ghost" id="attAddToggle" type="button" style="margin-top:6px;">+ Add student</button>
@@ -499,6 +502,7 @@
         <div class="field"><label for="attNewContact">Contact (optional)</label><input id="attNewContact" type="text" placeholder="phone"></div>
       </div>
       <button class="btn-primary" id="attAddBtn" type="button">Add &amp; tick</button>
+    </div>
     </div>
     <div id="attCount" style="font-size:12.5px; color:var(--ink-soft); margin:14px 0 8px;"></div>
     <button class="btn-primary" id="attSaveBtn" type="button">Save attendance</button>
@@ -1570,7 +1574,8 @@ function renderPartnerView(){
    Saved to an "Attendance" sheet, one row per student per day. Only dates
    that actually have attendance saved ever show up in the history. */
 let attRows = [];
-let att = { date:'', ticked:{}, extras:{}, filter:'All', view:'date', open:null };
+let closedRows = [];
+let att = { date:'', ticked:{}, extras:{}, filter:'All', view:'date', open:null, closed:false, reason:'', closedSupported:true };
 function localTodayISO(){
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -1593,9 +1598,20 @@ function attStudents(){
   Object.keys(att.extras).forEach(k => { if(!map[k]) map[k] = att.extras[k]; });
   return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
 }
+function syncClosedUI(){
+  $('attClosed').checked = att.closed;
+  $('attClosedRow').classList.toggle('on', att.closed);
+  $('attReasonField').style.display = att.closed ? '' : 'none';
+  $('attReason').value = att.reason || '';
+  $('attStudentsBlock').style.display = att.closed ? 'none' : '';
+}
 function loadTicksForDate(){
   att.ticked = {};
   attRows.forEach(r => { if(attRowDate(r) === att.date) att.ticked[attKey(r.StudentName)] = true; });
+  const c = closedRows.find(r => attRowDate(r) === att.date);
+  att.closed = !!c;
+  att.reason = c ? String(c.Reason || '') : '';
+  syncClosedUI();
 }
 async function loadAttendance(force){
   if(!att.date) att.date = localTodayISO();
@@ -1609,6 +1625,8 @@ async function loadAttendance(force){
       return;
     }
     attRows = data.attendance;
+    att.closedSupported = Array.isArray(data.closedDays);
+    closedRows = att.closedSupported ? data.closedDays : [];
     loadTicksForDate();
     renderAttList();
     renderAttHistory();
@@ -1617,6 +1635,7 @@ async function loadAttendance(force){
   }
 }
 function updateAttCount(){
+  if(att.closed){ $('attCount').textContent = 'Class closed on ' + attDateLabel(att.date); return; }
   const n = Object.keys(att.ticked).filter(k => att.ticked[k]).length;
   $('attCount').textContent = n + ' marked present on ' + attDateLabel(att.date);
 }
@@ -1632,17 +1651,25 @@ function renderAttList(){
 function renderAttHistory(){
   $('attByDate').classList.toggle('active', att.view === 'date');
   $('attByStudent').classList.toggle('active', att.view === 'student');
-  if(!attRows.length){ $('attHistory').innerHTML = '<div class="empty-note">No attendance saved yet.</div>'; return; }
+  if(!attRows.length && !closedRows.length){ $('attHistory').innerHTML = '<div class="empty-note">No attendance saved yet.</div>'; return; }
   const head = (id, title, sub) => `<div class="att-hist-head" data-id="${escapeHtml(id)}"><span>${title}</span><small>${sub} ${att.open === id ? '▲' : '▼'}</small></div>`;
   let html = '';
   if(att.view === 'date'){
-    const byDate = {};
+    const byDate = {}, closedMap = {};
     attRows.forEach(r => { const d = attRowDate(r); if(d) (byDate[d] = byDate[d] || []).push(r); });
-    html = Object.keys(byDate).sort().reverse().map(d => {
-      const rows = byDate[d].slice().sort((a, b) => String(a.StudentName).localeCompare(String(b.StudentName)));
+    closedRows.forEach(r => { const d = attRowDate(r); if(d) closedMap[d] = String(r.Reason || ''); });
+    const allDates = Object.keys(byDate).concat(Object.keys(closedMap).filter(d => !byDate[d])).sort().reverse();
+    html = allDates.map(d => {
+      const isClosed = closedMap[d] !== undefined;
+      const rows = (byDate[d] || []).slice().sort((x, y) => String(x.StudentName).localeCompare(String(y.StudentName)));
       const id = 'd:' + d;
-      const body = att.open !== id ? '' : `<div class="att-hist-body">${rows.map(r => `<div class="arow"><span>${escapeHtml(r.StudentName)}</span><small>${escapeHtml(r.ClassMode || '')}</small></div>`).join('')}<div style="padding-top:8px;"><button class="icon-btn" style="border:1px solid var(--line);" data-edit="${d}">Edit this day</button></div></div>`;
-      return `<div class="att-hist">${head(id, attDateLabel(d), rows.length + ' present')}${body}</div>`;
+      const btns = `<div style="padding-top:8px; display:flex; gap:8px;"><button class="icon-btn" style="border:1px solid var(--line);" data-edit="${d}">Edit</button><button class="icon-btn" style="border:1px solid var(--line);" data-delatt="${d}">Delete</button></div>`;
+      const list = isClosed
+        ? `<div class="arow"><span>Reason: ${escapeHtml(closedMap[d] || '—')}</span></div>`
+        : rows.map(r => `<div class="arow"><span>${escapeHtml(r.StudentName)}</span><small>${escapeHtml(r.ClassMode || '')}</small></div>`).join('');
+      const body = att.open !== id ? '' : `<div class="att-hist-body">${list}${btns}</div>`;
+      const sub = isClosed ? '<span style="color:var(--red);">Class closed</span>' : (rows.length + ' present');
+      return `<div class="att-hist">${head(id, attDateLabel(d), sub)}${body}</div>`;
     }).join('');
   }else{
     const byStu = {};
@@ -1652,13 +1679,28 @@ function renderAttHistory(){
       if(!byStu[k]) byStu[k] = { name:r.StudentName, dates:[] };
       byStu[k].dates.push(attRowDate(r));
     });
-    html = Object.keys(byStu).sort((a, b) => byStu[a].name.localeCompare(byStu[b].name)).map(k => {
+    html = Object.keys(byStu).sort((x, y) => byStu[x].name.localeCompare(byStu[y].name)).map(k => {
       const st = byStu[k], dates = st.dates.slice().sort().reverse(), id = 's:' + k;
       const body = att.open !== id ? '' : `<div class="att-hist-body">${dates.map(d => `<div class="arow"><span>${attDateLabel(d)}</span></div>`).join('')}</div>`;
       return `<div class="att-hist">${head(id, escapeHtml(st.name), dates.length + (dates.length === 1 ? ' class' : ' classes'))}${body}</div>`;
     }).join('');
   }
-  $('attHistory').innerHTML = html;
+  $('attHistory').innerHTML = html || '<div class="empty-note">No attendance saved yet.</div>';
+}
+async function deleteAttendanceDate(d){
+  try{
+    await api({ action:'deleteAttendance', date:d });
+    invalidateCache();
+    const data = await apiGet(true);
+    attRows = data.attendance || [];
+    closedRows = Array.isArray(data.closedDays) ? data.closedDays : [];
+    if(att.date === d) loadTicksForDate();
+    att.open = null;
+    renderAttList(); renderAttHistory();
+    setNotice('attNotice', 'Deleted everything recorded for ' + attDateLabel(d) + '.', true);
+  }catch(e){
+    setNotice('attNotice', 'Could not delete: ' + (e.message || e), false);
+  }
 }
 function editAttDate(d){
   att.date = d; $('attDate').value = d;
@@ -1667,6 +1709,8 @@ function editAttDate(d){
   setNotice('attNotice', 'Editing ' + attDateLabel(d) + ' — tick or untick, then save.', true);
 }
 $('attDate').addEventListener('change', e => { att.date = e.target.value || localTodayISO(); loadTicksForDate(); renderAttList(); setNotice('attNotice', '', false); });
+$('attClosed').addEventListener('change', e => { att.closed = e.target.checked; syncClosedUI(); updateAttCount(); });
+$('attReason').addEventListener('input', e => { att.reason = e.target.value; });
 $('attFilter').addEventListener('change', e => { att.filter = e.target.value; renderAttList(); });
 $('attSearch').addEventListener('input', renderAttList);
 $('attList').addEventListener('change', e => {
@@ -1698,17 +1742,22 @@ $('attSaveBtn').addEventListener('click', async () => {
   const map = {};
   attStudents().forEach(s => { map[attKey(s.name)] = s; });
   const entries = Object.keys(att.ticked).filter(k => att.ticked[k] && map[k]).map(k => ({ name:map[k].name, classMode:map[k].mode, contact:map[k].contact }));
+  if(att.closed){
+    if(!$('attReason').value.trim()){ setNotice('attNotice', 'Write the reason the class was closed.', false); return; }
+    if(!att.closedSupported){ setNotice('attNotice', 'Update the Google Apps Script to v10 to use "Class closed".', false); return; }
+  }
   const btn = $('attSaveBtn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try{
-    await api({ action:'saveAttendance', date:att.date, entries });
+    await api(att.closed ? { action:'saveAttendance', date:att.date, closed:true, reason:$('attReason').value.trim() } : { action:'saveAttendance', date:att.date, entries });
     invalidateCache();
     const data = await apiGet(true);
     attRows = data.attendance || [];
+    closedRows = Array.isArray(data.closedDays) ? data.closedDays : [];
     att.extras = {};
     loadTicksForDate();
     renderAttList(); renderAttHistory();
-    setNotice('attNotice', entries.length ? ('Saved — ' + entries.length + ' present on ' + attDateLabel(att.date) + '.') : ('Attendance cleared for ' + attDateLabel(att.date) + '.'), true);
+    setNotice('attNotice', att.closed ? ('Saved — class closed on ' + attDateLabel(att.date) + '.') : entries.length ? ('Saved — ' + entries.length + ' present on ' + attDateLabel(att.date) + '.') : ('Attendance cleared for ' + attDateLabel(att.date) + '.'), true);
   }catch(e){
     setNotice('attNotice', 'Could not save: ' + (e.message || e), false);
   }finally{
@@ -1718,6 +1767,8 @@ $('attSaveBtn').addEventListener('click', async () => {
 $('attByDate').addEventListener('click', () => { att.view = 'date'; att.open = null; renderAttHistory(); });
 $('attByStudent').addEventListener('click', () => { att.view = 'student'; att.open = null; renderAttHistory(); });
 $('attHistory').addEventListener('click', e => {
+  const del = e.target.closest('[data-delatt]');
+  if(del){ armDeleteButton(del, () => deleteAttendanceDate(del.dataset.delatt)); return; }
   const ed = e.target.closest('[data-edit]');
   if(ed){ editAttDate(ed.dataset.edit); return; }
   const h = e.target.closest('.att-hist-head');
