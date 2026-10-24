@@ -486,7 +486,11 @@
 
 <!-- ================= ATTENDANCE TAB ================= -->
 <div class="page" id="page-attendance">
-  <div class="card">
+  <div class="mode-toggle" style="margin-bottom:14px;">
+    <button type="button" class="active" id="attTabMark">Mark attendance</button>
+    <button type="button" id="attTabHistory">History</button>
+  </div>
+  <div class="card" id="attMarkCard">
     <h3>Mark attendance</h3>
     <div class="row2">
       <div class="field"><label for="attDate">Date</label><input id="attDate" type="date"></div>
@@ -513,12 +517,13 @@
     <button class="btn-primary" id="attSaveBtn" type="button">Save attendance</button>
     <div class="notice" id="attNotice"></div>
   </div>
-  <div class="card">
+  <div class="card" id="attHistoryCard" style="display:none;">
     <h3>Attendance history</h3>
     <div class="mode-toggle" style="margin-bottom:14px;">
       <button type="button" class="active" id="attByDate">By date</button>
       <button type="button" id="attByStudent">By student</button>
     </div>
+    <div class="notice" id="attHistNotice"></div>
     <div id="attHistory"><div class="empty-note">Loading…</div></div>
   </div>
 </div>
@@ -805,6 +810,7 @@ function openStudentDetail(displayName){
   if(!s) return;
   currentStudentKey = key;
   $('studentsListCard').style.display = 'none';
+  $('dueCard').style.display = 'none';
   $('studentDetailCard').style.display = 'block';
   $('studentDetailName').textContent = s.displayName;
   $('studentDetailContact').textContent = s.phone ? ('Contact: ' + s.phone) : 'No contact number on file yet — it will be remembered as soon as it\'s entered on a receipt.';
@@ -826,6 +832,7 @@ function openStudentDetail(displayName){
 }
 $('backToStudentsList').addEventListener('click', () => {
   $('studentDetailCard').style.display = 'none';
+  $('dueCard').style.display = '';
   $('studentsListCard').style.display = 'block';
   window.scrollTo(0, 0);
 });
@@ -863,9 +870,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if(btn.dataset.tab === 'history') loadHistory();
     if(btn.dataset.tab === 'expenses') loadExpenses();
     if(btn.dataset.tab === 'summary') loadSummary();
-    if(btn.dataset.tab === 'attendance') loadAttendance(true);
+    if(btn.dataset.tab === 'attendance'){ setAttPage('mark'); loadAttendance(true); }
     if(btn.dataset.tab === 'students'){
       $('studentDetailCard').style.display = 'none';
+      $('dueCard').style.display = '';
       $('studentsListCard').style.display = 'block';
       loadStudentDirectory();
     }
@@ -1507,10 +1515,23 @@ function studentRows(list){
 }
 
 function setPartnerPeriod(v){ partnerView.period = v; renderPartnerView(); }
+// Scrolls just enough that an element that was opened is fully on screen
+// (keeping its top clear of the sticky top bar); does nothing if it already is.
+function bringIntoView(el){
+  if(!el) return;
+  const bar = document.querySelector('.topbar');
+  const barH = bar ? bar.offsetHeight : 0;
+  const r = el.getBoundingClientRect();
+  const underTop = r.top - barH - 12;
+  const overBottom = r.bottom - window.innerHeight + 16;
+  const delta = underTop < 0 ? underTop : (overBottom > 0 ? Math.min(overBottom, underTop) : 0);
+  if(Math.abs(delta) > 1) window.scrollBy({ top:delta, behavior:'smooth' });
+}
 function togglePartner(i){
   const n = PARTNERS[i];
   partnerView.open = (partnerView.open === n) ? null : n;
   renderPartnerView();
+  if(partnerView.open) bringIntoView(document.querySelector('.pdetail'));
 }
 
 function renderPartnerSplit(receipts, expenses){
@@ -1734,12 +1755,23 @@ async function deleteAttendanceDate(d){
     if(att.date === d) loadTicksForDate();
     att.open = null;
     renderAttList(); renderAttHistory();
-    setNotice('attNotice', 'Deleted everything recorded for ' + attDateLabel(d) + '.', true);
+    setNotice('attHistNotice', 'Deleted everything recorded for ' + attDateLabel(d) + '.', true);
   }catch(e){
-    setNotice('attNotice', 'Could not delete: ' + (e.message || e), false);
+    setNotice('attHistNotice', 'Could not delete: ' + (e.message || e), false);
   }
 }
+function setAttPage(v){
+  const hist = v === 'history';
+  $('attTabMark').classList.toggle('active', !hist);
+  $('attTabHistory').classList.toggle('active', hist);
+  $('attMarkCard').style.display = hist ? 'none' : '';
+  $('attHistoryCard').style.display = hist ? '' : 'none';
+  window.scrollTo(0, 0);
+}
+$('attTabMark').addEventListener('click', () => setAttPage('mark'));
+$('attTabHistory').addEventListener('click', () => setAttPage('history'));
 function editAttDate(d){
+  setAttPage('mark');
   att.date = d; $('attDate').value = d;
   loadTicksForDate(); renderAttList();
   window.scrollTo(0, 0);
@@ -1809,7 +1841,14 @@ $('attHistory').addEventListener('click', e => {
   const ed = e.target.closest('[data-edit]');
   if(ed){ editAttDate(ed.dataset.edit); return; }
   const h = e.target.closest('.att-hist-head');
-  if(h){ att.open = (att.open === h.dataset.id) ? null : h.dataset.id; renderAttHistory(); }
+  if(h){
+    att.open = (att.open === h.dataset.id) ? null : h.dataset.id;
+    renderAttHistory();
+    if(att.open){
+      const opened = Array.from(document.querySelectorAll('.att-hist-head')).find(x => x.dataset.id === att.open);
+      if(opened) bringIntoView(opened.parentElement);
+    }
+  }
 });
 
 /* ---------- init ---------- */
