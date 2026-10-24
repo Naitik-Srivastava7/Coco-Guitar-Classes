@@ -220,6 +220,12 @@
   .att-hist-body .arow{ display:flex; justify-content:space-between; gap:10px; padding:6px 0; }
   .att-hist-body small{ color:var(--ink-soft); }
 
+  .drow.hl{ background:rgba(184,134,46,0.13); border-radius:8px; padding:6px 8px; margin:2px -8px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .drow.hl .dlabel{ font-weight:600; }
+  .drow.hl .dval{ font-weight:700; font-size:1.05em; }
+  .att-month{ font-weight:700; font-size:13px; margin:12px 0 2px; }
+  .att-month:first-child{ margin-top:4px; }
+  .att-total{ border-top:1px dashed var(--line); margin-top:4px; font-weight:700; }
   @media print{
     body *{ visibility:hidden; }
     #printArea, #printArea *{ visibility:visible; }
@@ -339,10 +345,10 @@
             <option>Personal Classes – 2/Week</option>
           </select>
         </div>
-        <div class="field"><label for="feeMonth">Fee month</label>
+        <div class="field" id="feeMonthField"><label for="feeMonth">Fee month</label>
           <input id="feeMonth" type="text" placeholder="e.g. May, or May–July">
         </div>
-        <div class="field"><label for="feeType">Fee type</label>
+        <div class="field" id="feeTypeField"><label for="feeType">Fee type</label>
           <select id="feeType">
             <option value="">Select fee type</option>
             <option>Entry fee</option><option>Monthly fee</option><option>Entry + Monthly</option><option>Pending fee</option>
@@ -395,13 +401,12 @@
         <div class="details" style="margin-top:14px;">
           <div class="drow" id="pBatchRow"><span class="dlabel">Batch</span><span class="dval" id="pBatch">—</span></div>
           <div class="drow"><span class="dlabel">Class type</span><span class="dval" id="pClassType">Institute</span></div>
-          <div class="drow"><span class="dlabel">Fee month</span><span class="dval" id="pFeeMonth">—</span></div>
-          <div class="drow"><span class="dlabel">Fee type</span><span class="dval" id="pFeeType">—</span></div>
+          <div class="drow" id="pFeeMonthRow"><span class="dlabel">Fee month</span><span class="dval" id="pFeeMonth">—</span></div>
+          <div class="drow" id="pFeeTypeRow"><span class="dlabel" id="pFeeTypeLabel">Fee type</span><span class="dval" id="pFeeType">—</span></div>
           <div class="drow"><span class="dlabel">Payment mode</span><span class="dval" id="pPaymentMode">—</span></div>
         </div>
         <div class="totals">
           <table>
-            <tr id="pPerClassRow" style="display:none;"><td class="label">Classes</td><td id="pPerClass">—</td></tr>
             <tr><td class="label">Total batch fee</td><td id="pTotalFee">0.00</td></tr>
             <tr><td class="label">Amount paid</td><td id="pAmountPaid">0.00</td></tr>
             <tr class="grand" id="pDueRow"><td>Due</td><td id="pDue">0.00</td></tr>
@@ -532,7 +537,11 @@
   <div class="card" id="studentDetailCard" style="display:none;">
     <button class="btn-ghost" id="backToStudentsList" type="button" style="width:auto; padding:6px 14px; margin-bottom:14px;">← Back to list</button>
     <h3 id="studentDetailName">Student</h3>
-    <div id="studentDetailContact" style="font-size:12.5px; color:var(--ink-soft); margin-bottom:16px;"></div>
+    <div id="studentDetailContact" style="font-size:12.5px; color:var(--ink-soft); margin-bottom:12px;"></div>
+    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; background:var(--brass-bg); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:16px;">
+      <span style="font-size:12.5px; color:var(--ink-soft);">Total earned from this student<br><span id="studentReceiptCount"></span></span>
+      <span id="studentTotalPaid" class="num" style="font-family:'Fraunces',serif; font-size:22px; font-weight:700;">₹0</span>
+    </div>
     <div id="studentTimeline"></div>
     <hr class="hr">
     <h3>Mark a month as waived</h3>
@@ -621,6 +630,7 @@ function buildStudentDirectory(onlineRows, offlineRows){
       if(!dir[key]) dir[key] = { displayName: name, receipts: [] };
       dir[key].receipts.push({
         receiptNumber: r.ReceiptNo, billDate: r.Date, feeMonth: r.FeeMonth, feeType: r.FeeType,
+        billing: r.Billing === 'Per class' ? 'Per class' : 'Fixed', classCount: r.Classes || '',
         totalFee: r.TotalFee, amountPaid: r.AmountPaid, due: r.Due, paymentMode: r.PaymentMode,
         currency: r.Currency || '₹', classMode, studentContact: r.StudentContact, batch: r.Batch
       });
@@ -798,10 +808,14 @@ function openStudentDetail(displayName){
   $('studentDetailCard').style.display = 'block';
   $('studentDetailName').textContent = s.displayName;
   $('studentDetailContact').textContent = s.phone ? ('Contact: ' + s.phone) : 'No contact number on file yet — it will be remembered as soon as it\'s entered on a receipt.';
+  const earned = s.receipts.reduce((t, r) => t + (parseFloat(r.amountPaid) || 0), 0);
+  const paidCount = s.receipts.filter(r => (parseFloat(r.amountPaid) || 0) > 0).length;
+  $('studentTotalPaid').textContent = fmtInr(earned);
+  $('studentReceiptCount').textContent = paidCount + (paidCount === 1 ? ' payment' : ' payments');
   $('studentTimeline').innerHTML = s.receipts.map(r => `
     <div class="hist-row">
       <span class="badge ${r.classMode.toLowerCase()}">${r.classMode}</span>
-      <span class="hname">${escapeHtml(r.feeMonth) || '—'}${r.feeType === 'Waived' ? ' (waived)' : ''}</span>
+      <span class="hname">${r.billing === 'Per class' ? escapeHtml(String(r.classCount || '')) + ' classes' : (escapeHtml(r.feeMonth) || '—')}${r.feeType === 'Waived' ? ' (waived)' : ''}</span>
       <span class="hmeta">${formatDate(r.billDate)} · ${escapeHtml(r.feeType)}</span>
       <span class="hamt num">${r.feeType === 'Waived' ? '—' : r.currency + (parseFloat(r.amountPaid)||0).toFixed(0)}</span>
     </div>`).join('');
@@ -865,7 +879,7 @@ function setMode(mode){
   state.classMode = mode;
   $('modeOnline').classList.toggle('active', mode === 'Online');
   $('modeOffline').classList.toggle('active', mode === 'Offline');
-  $('batchField').style.display = mode === 'Offline' ? 'none' : 'flex';
+  applyFieldVisibility();
   renderPaper();
 }
 
@@ -895,7 +909,7 @@ function renderPaper(){
   $('pStudentName').textContent = state.studentName || 'Student name';
   $('pStudentContact').textContent = state.studentContact || '';
   $('pBatch').textContent = state.batch || '—';
-  $('pBatchRow').style.display = state.classMode === 'Offline' ? 'none' : 'flex';
+  $('pBatchRow').style.display = (state.classMode === 'Offline' || state.billing === 'Per class') ? 'none' : 'flex';
   $('pClassType').textContent = (state.classType === 'Private') ? ('Private · ' + (state.takenBy || '—')) : 'Institute';
   $('pFeeMonth').textContent = state.feeMonth || '—';
   $('pFeeType').textContent = state.feeType || '—';
@@ -903,9 +917,13 @@ function renderPaper(){
   $('pModeBadge').textContent = state.classMode;
   $('pModeBadge').className = 'badge ' + (state.classMode === 'Online' ? 'online' : 'offline');
 
+  // Per-class bills: no fee month / fee type — the class count takes the
+  // fee type's place on the bill, highlighted.
   const isPer = state.billing === 'Per class';
-  $('pPerClassRow').style.display = isPer ? '' : 'none';
-  if(isPer) $('pPerClass').textContent = (state.classCount || 0) + ' × ' + money(state.currency, parseFloat(state.classRate) || 0);
+  $('pFeeMonthRow').style.display = isPer ? 'none' : 'flex';
+  $('pFeeTypeRow').classList.toggle('hl', isPer);
+  $('pFeeTypeLabel').textContent = isPer ? 'Classes' : 'Fee type';
+  if(isPer) $('pFeeType').textContent = (state.classCount || 0) + (parseFloat(state.classCount) === 1 ? ' class' : ' classes') + ' × ' + money(state.currency, parseFloat(state.classRate) || 0);
   const total = parseFloat(state.totalFee) || 0;
   const paid = parseFloat(state.amountPaid) || 0;
   const due = computeDue();
@@ -942,6 +960,14 @@ function setBilling(type){
   $('classCount').value = state.classCount; $('classRate').value = state.classRate;
   $('totalFee').readOnly = isPer;
   $('totalFeeLabel').textContent = isPer ? 'Total fee (classes × rate)' : 'Total batch fee';
+  applyFieldVisibility();
+}
+// Per-class bills don't use batch, fee month or fee type; Offline never uses batch.
+function applyFieldVisibility(){
+  const isPer = state.billing === 'Per class';
+  $('batchField').style.display = (isPer || state.classMode === 'Offline') ? 'none' : 'flex';
+  $('feeMonthField').style.display = isPer ? 'none' : '';
+  $('feeTypeField').style.display = isPer ? 'none' : '';
 }
 function recalcPerClass(){
   if(state.billing === 'Per class'){
@@ -981,7 +1007,7 @@ function toWhatsAppNumber(raw){
 }
 function buildWhatsAppMessage(){
   const d = new Date(state.billDate || todayISO());
-  const monthPart = state.feeMonth || d.toLocaleDateString('en-GB', { month:'long' });
+  const monthPart = (state.billing === 'Per class' ? '' : state.feeMonth) || d.toLocaleDateString('en-GB', { month:'long' });
   const yearPart = isNaN(d) ? new Date().getFullYear() : d.getFullYear();
   const due = computeDue();
   let msg = `Hi ${state.studentName || 'there'}, here is your Coco Guitar Classes payment receipt for ${monthPart} ${yearPart}.\n`;
@@ -1055,7 +1081,7 @@ function invalidateCache(){ sheetDataCache = null; }
 const originalTitle = document.title;
 function receiptFilenameBase(){
   const d = new Date(state.billDate || todayISO());
-  const monthPart = state.feeMonth || d.toLocaleDateString('en-GB', { month:'long' });
+  const monthPart = (state.billing === 'Per class' ? '' : state.feeMonth) || d.toLocaleDateString('en-GB', { month:'long' });
   const yearPart = isNaN(d) ? new Date().getFullYear() : d.getFullYear();
   const raw = [state.studentName || 'Receipt', monthPart, yearPart].filter(Boolean).join(' ');
   return raw.replace(/[\/\\:*?"<>|]/g, '-'); // keep the filename safe from free-text characters
@@ -1122,8 +1148,9 @@ $('saveBtn').addEventListener('click', async () => {
   const record = {
     action: isEditingReceipt ? 'update' : 'save',
     billDate: state.billDate, studentName: state.studentName, studentContact: state.studentContact,
-    batch: state.classMode === 'Offline' ? '' : state.batch, feeMonth: state.feeMonth,
-    feeType: state.feeType, totalFee: state.totalFee, amountPaid: state.amountPaid, due,
+    batch: (state.classMode === 'Offline' || state.billing === 'Per class') ? '' : state.batch,
+    feeMonth: state.billing === 'Per class' ? '' : state.feeMonth,
+    feeType: state.billing === 'Per class' ? 'Per class' : state.feeType, totalFee: state.totalFee, amountPaid: state.amountPaid, due,
     paymentMode: state.paymentMode, classMode: state.classMode, currency: state.currency,
     instructorName: state.instructorName, phone: state.phone,
     classType: state.classType, takenBy: state.classType === 'Private' ? state.takenBy : '',
@@ -1168,7 +1195,7 @@ function editReceipt(receiptNumber, classMode){
   state.receiptNumber = r.receiptNumber;
   state.studentName = r.studentName; state.studentContact = r.studentContact || '';
   state.billDate = r.billDate ? String(r.billDate).slice(0,10) : todayISO();
-  state.batch = r.batch || ''; state.feeMonth = r.feeMonth || ''; state.feeType = r.feeType || '';
+  state.batch = r.batch || ''; state.feeMonth = r.feeMonth || ''; state.feeType = r.billing === 'Per class' ? '' : (r.feeType || '');
   state.totalFee = r.totalFee || ''; state.amountPaid = r.amountPaid || ''; state.paymentMode = r.paymentMode || '';
   state.currency = r.currency || '₹'; state.instructorName = r.instructorName || '';
 
@@ -1263,7 +1290,7 @@ function renderHistory(){
       <div class="hist-row">
         <span class="badge ${r.classMode.toLowerCase()}">${r.classMode}</span>
         <span class="hname">${escapeHtml(r.studentName)||'—'}${r.feeType==='Waived' ? ' (waived)' : ''}</span>
-        <span class="hmeta">${formatDate(r.billDate)} · ${escapeHtml(r.batch)||(r.classMode==='Offline'?'Offline class':'—')}${r.feeMonth ? ' · ' + escapeHtml(r.feeMonth) : ''}${r.classType==='Private' ? ' · Private (' + escapeHtml(String(r.takenBy).split(' ')[0]) + ')' : ''}</span>
+        <span class="hmeta">${formatDate(r.billDate)} · ${escapeHtml(r.batch)||(r.classMode==='Offline'?'Offline class':'—')}${r.feeMonth ? ' · ' + escapeHtml(r.feeMonth) : ''}${r.billing==='Per class' ? ' · ' + escapeHtml(String(r.classCount)) + ' classes' : ''}${r.classType==='Private' ? ' · Private (' + escapeHtml(String(r.takenBy).split(' ')[0]) + ')' : ''}</span>
         <span class="hamt num">${r.currency}${(parseFloat(r.amountPaid)||0).toFixed(0)}</span>
         <button class="icon-btn" data-edit="${r.receiptNumber}" data-mode="${r.classMode}" title="Edit">Edit</button>
         <button class="icon-btn" data-del="${r.receiptNumber}" data-mode="${r.classMode}" title="Delete">Delete</button>
@@ -1681,8 +1708,18 @@ function renderAttHistory(){
     });
     html = Object.keys(byStu).sort((x, y) => byStu[x].name.localeCompare(byStu[y].name)).map(k => {
       const st = byStu[k], dates = st.dates.slice().sort().reverse(), id = 's:' + k;
-      const body = att.open !== id ? '' : `<div class="att-hist-body">${dates.map(d => `<div class="arow"><span>${attDateLabel(d)}</span></div>`).join('')}</div>`;
-      return `<div class="att-hist">${head(id, escapeHtml(st.name), dates.length + (dates.length === 1 ? ' class' : ' classes'))}${body}</div>`;
+      const byMonth = {};
+      dates.forEach(d => { const mk = d.slice(0, 7); (byMonth[mk] = byMonth[mk] || []).push(d); });
+      const months = Object.keys(byMonth).sort().reverse().map(mk => {
+        const md = new Date(mk + '-01T00:00:00');
+        const title = isNaN(md) ? mk : md.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+        const n = byMonth[mk].length;
+        return `<div class="att-month">${title}</div>` +
+          byMonth[mk].map(d => `<div class="arow"><span>${attDateLabel(d)}</span></div>`).join('') +
+          `<div class="arow att-total"><span>Total</span><span>${n} ${n === 1 ? 'class' : 'classes'}</span></div>`;
+      }).join('');
+      const body = att.open !== id ? '' : `<div class="att-hist-body">${months}</div>`;
+      return `<div class="att-hist">${head(id, escapeHtml(st.name), dates.length + (dates.length === 1 ? ' class' : ' classes') + ' total')}${body}</div>`;
     }).join('');
   }
   $('attHistory').innerHTML = html || '<div class="empty-note">No attendance saved yet.</div>';
